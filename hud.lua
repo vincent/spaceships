@@ -11,12 +11,12 @@ function Hud.load()
         'ABCDEFGHIJKLMNOPQRSTUVWXYZ0' ..
         '123456789.,!?-+/():;%&`\'*#=[]"')
 
-    jump.x = 100
-    jump.y = love.graphics.getHeight() - 100
+    jump.x = love.graphics.getWidth() - 100
+    jump.y = 100
     jump.text = love.graphics.newText(font, 'jump')
 
-    currentZone.x = 300
-    currentZone.y = love.graphics.getHeight() - 100
+    currentZone.x = love.graphics.getWidth() - 100
+    currentZone.y = 200
 end
 
 function Hud.update()

@@ -1,4 +1,4 @@
-flux = require('vendor/flux')
+flux = require 'vendor/flux'
 
 local Space = {}
 
@@ -7,6 +7,30 @@ speedMax = 10;
 
 Space.speed = speedLow
 Space.boost = 0.0
+
+function Space.draw()
+    love.graphics.setShader(myShader)
+    love.graphics.rectangle('fill', 0, 0, love.graphics.getWidth(), love.graphics.getHeight())
+    love.graphics.setShader()
+end
+
+function Space.update(dt)
+    myShader:send('iResolution', {
+        love.graphics.getWidth(),
+        love.graphics.getHeight(),
+        0
+    })  
+    myShader:send('iTime', love.timer.getTime())
+    myShader:send('fSpeed', Space.speed)
+    myShader:send('fBoost', Space.boost)
+end
+
+function Space.boostWhile(secs)
+    flux.to(Space, 0.5, { speed = speedMax })
+    flux.to(Space, secs, { boost = Space.boost + 20 })
+        :delay(0.1)
+        :after(Space, 0.1, { speed = speedLow })
+end
 
 function Space.load()
     myShader = love.graphics.newShader[[
@@ -26,18 +50,17 @@ function Space.load()
         uniform vec4      iMouse;                // mouse pixel coords. xy: current (if MLB down), zw: click
         uniform float     fSpeed;                // starfield speed
         uniform float     fBoost;                // starfield boost
-        
-        
+
         float fBrightness = 2.5;
         
         // Number of angular segments
         float fSteps = 121.0;
         
-        float fParticleSize = 0.015;
+        float fParticleSize = 0.015 - 0.001 * fSpeed;
         float fParticleLength = 0.5 / 60.0;
         
         // Min and Max star position radius. Min must be present to prevent stars too near camera
-        float fMinDist = 1.0;
+        float fMinDist = 2.0;
         float fMaxDist = 5.0;
         
         float fRepeatMin = 1.0;
@@ -69,8 +92,8 @@ function Space.load()
                 
             float fClosestDist = length(vDeltaPos) / fParticleSize;
             
-            float fShade = 	clamp(1.0 - fClosestDist, 0.0, 1.0);
-                
+            float fShade = clamp(1.0 - fClosestDist, 0.0, 1.0);
+
             fShade = fShade * exp2(-d * fDepthFade) * fBrightness;
             
             return vec3(fShade);
@@ -135,32 +158,22 @@ function Space.load()
             return vResult;
         }
  
-        // void mainImage( out vec4 fragColor, in vec2 fragCoord )
-        // vec4 effect( vec4 color, Image texture, vec2 texture_coords, vec2 screen_coords )
-        vec4 effect( vec4 color, Image texture, vec2 texture_coords, vec2 fragCoord )
+        vec4 effect( vec4 color, Image texture, vec2 texture_coords, vec2 screen_coords )
         {
-            vec2 vScreenUV = fragCoord.xy / iResolution.xy;
+            vec2 vScreenUV = screen_coords.xy / iResolution.xy;
             
             vec2 vScreenPos = vScreenUV * 2.0 - 1.0;
             vScreenPos.x *= iResolution.x / iResolution.y;
         
             vec3 vRayDir = normalize(vec3(vScreenPos, 1.0));
         
-            vec3 vEuler = vec3(0.5 + sin(iTime * 0.2) * 0.125, 0.5 + sin(iTime * 0.1) * 0.125, iTime * 0.1 + sin(iTime * 0.3) * 0.5);
-
             /* * /
-            if(iMouse.z > 0.0)
-            {
-                vEuler.x = -((iMouse.y / iResolution.y) * 2.0 - 1.0);
-                vEuler.y = -((iMouse.x / iResolution.x) * 2.0 - 1.0);
-                vEuler.z = 0.0;
-            }
-            /* */
-                
+            vec3 vEuler = vec3(0.5 + sin(iTime * 0.2) * 0.0125, 0.5 + sin(iTime * 0.1) * 0.0125, iTime * 0.1 + sin(iTime * 0.3) * 0.05);
             vRayDir = RotateX(vRayDir, vEuler.x);
             vRayDir = RotateY(vRayDir, vEuler.y);
             vRayDir = RotateZ(vRayDir, vEuler.z);
-            
+            /* */
+
             float fShade = 0.0;
                 
             float a = 0.2;
@@ -174,39 +187,15 @@ function Space.load()
             
             vec3 vResult = mix(vec3(0.005, 0.0, 0.01), vec3(0.01, 0.005, 0.0), vRayDir.y * 0.5 + 0.5);
             
-            for(int i=0; i<PASS_COUNT; i++)
+            for (int i=0; i < PASS_COUNT; i++)
             {
                 vResult += Starfield(vRayDir, fZPos, fSeed);
                 fSeed += 1.234;
             }
             
-            return vec4(sqrt(vResult),1.0);
+            return vec4(sqrt(vResult), 1.0);
         }
     ]]
-end
-
-function Space.draw()
-    love.graphics.setShader(myShader)
-    love.graphics.rectangle('fill', 0, 0, love.graphics.getWidth(), love.graphics.getHeight())
-    love.graphics.setShader()
-end
-
-function Space.update(dt)
-    myShader:send('iResolution', {
-        love.graphics.getWidth(),
-        love.graphics.getHeight(),
-        0
-    })  
-    myShader:send('iTime', love.timer.getTime())
-    myShader:send('fSpeed', Space.speed)
-    myShader:send('fBoost', Space.boost)
-end
-
-function Space.boostWhile(secs)
-    flux.to(Space, 0.5, { speed = speedMax })
-    flux.to(Space, secs, { boost = Space.boost+10 })
-        :delay(0.1)
-        :after(Space, 0.2, { speed = speedLow })
 end
 
 return Space

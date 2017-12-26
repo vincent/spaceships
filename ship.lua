@@ -1,57 +1,85 @@
 sti = require 'vendor/sti'
+flux = require 'vendor/flux'
+
 local hud = require 'hud'
 
-local Ship = {}
+local Ship = {
+    zoomX = 0.3,
+    zoomY = 0.2,
+    offsetX = 1000,
+    offsetY = (900 + 100)
+}
+
+local tilesLayer = nil
+local floorLayer = nil
+local zonesLayer = nil
+local objectsLayer = nil
 
 function Ship.load()
-    -- Load map file
-    map = sti('ship1_tiles_64.lua')
-    tilesLayer = map.layers['tiles']
-    tilesLayer.opacity = 0
-    tilesLayer.over = false
+    map = sti('ships/test.lua')
+    map.opacity = 0
 
-    zonesLayer = map.layers['zones']
-    zonesLayer.opacity = 0
+    tilesLayer   = map.layers['tiles']
+    tilesLayer   = map.layers['tiles']
+    floorLayer   = map.layers['floor']
+    zonesLayer   = map.layers['zones']
+    objectsLayer = map.layers['objects']
+    overlayCut   = map.layers['back_cut']
+    overlayFull  = map.layers['back_full']
+
+    overlayCut.opacity = 1
+    overlayFull.opacity = 1
+
+    map:resize(overlayFull.width * 3, overlayFull.height * 3)
 end
 
 function Ship.update(dt)
-    -- Update world
     map:update(dt)
 
-    mx = love.mouse.getX()
-    my = love.mouse.getY()
-    
-    tilesLayer.hover = false
-    if mx >= tilesLayer.x and mx <= tilesLayer.x + tilesLayer.width * 64 then
-        if my >= tilesLayer.y and my < tilesLayer.y + tilesLayer.height * 64 then
-            tilesLayer.hover = true
-        end
-    end
+    hud.setCurrentZone(nil)
+    local zone = Ship.overObject(zonesLayer)
 
-    if (tilesLayer.hover) then
-        tilesLayer.opacity = 1
+    if (zone) then
+        hud.setCurrentZone(zone.name)
+        Ship.toggleMapVisibility(1)
     else
-        tilesLayer.opacity = 0
+        Ship.toggleMapVisibility(0)
     end
+end
+
+function Ship.toggleMapVisibility(visible)
+    objectsLayer.opacity = 0
+    zonesLayer.opacity = 0
+
+    flux.to(floorLayer,  0.2, { opacity = visible })
+    flux.to(tilesLayer,  0.2, { opacity = visible })
+    flux.to(overlayFull, 0.2, { opacity = (1 - visible) })
+
+    flux.to(Ship, 0.2, {
+        offsetY = (visible == 1) and (900 + 0) or (900 + 100),
+        zoomY = (visible == 1) and 0.25 or 0.2
+    })
 end
 
 function Ship.draw()
-    -- Draw world
-    map:draw()
+    map:draw(Ship.offsetX, Ship.offsetY, Ship.zoomX, Ship.zoomY)
 end
 
 function Ship.mousepressed (x, y, button, istouch)
-    hud.setCurrentZone(nil)
-    object = Ship.hoverObject(x, y)
-    if (object) then
-        hud.setCurrentZone(object.name)
-    end
 end
 
-function Ship.hoverObject (x, y)
-    for i,o in pairs(zonesLayer.objects) do
-        if mx >= o.x and mx <= o.x + o.width then
-            if my >= o.y and my < o.y + o.height then
+function Ship.overObject (layer)
+    local mx = love.mouse.getX()
+    local my = love.mouse.getY()
+
+    for i, o in pairs(layer.objects) do
+        local ox = (o.x + Ship.offsetX) * Ship.zoomX
+        local oy = (o.y + Ship.offsetY) * Ship.zoomY
+        local owidth = o.width * Ship.zoomX
+        local oheight = o.height * Ship.zoomY
+
+        if mx >= ox and mx <= ox + owidth then
+            if my >= oy and my < oy + oheight then
                 return o
             end
         end
